@@ -1,0 +1,886 @@
+[
+  {
+    "id": "INC-201",
+    "title": "Postgres read replica lag causing slow queries",
+    "service": "database-cluster",
+    "severity": "high",
+    "symptoms": "Read queries returning stale data, replica lag ~30s, slower reads, DB alerts firing.",
+    "metrics": "replica_lag_seconds: 30, read_query_p99_ms: 8500, replication_throughput_mbps: 12 (normal: 100)",
+    "logs": "[WARNING] Replication lag on replica-3 exceeded threshold: 30s\n[ERROR] Read query timeout on replica-3 after 8500ms\n[WARNING] WAL sender on primary showing high pending bytes: 2.3GB",
+    "recent_change": "Write throughput increased ~3x after a batch import feature deployed two hours ago.",
+    "status": "open",
+    "created_at": "2026-09-29T13:22:23.008331+00:00",
+    "analysis": {
+      "summary": "The database cluster is experiencing a 30\u2011second replication lag on replica\u20113 after a recent batch import that tripled write throughput. The lag is causing stale reads and slow query timeouts.",
+      "likely_causes": [
+        {
+          "cause": "WAL backlog due to 3x write throughput from the new batch import",
+          "confidence": 0.95,
+          "reasoning": "Logs show 2.3\u202fGB pending WAL bytes and the incident matches TEST\u2011001 where the same pattern was observed."
+        },
+        {
+          "cause": "Replica I/O bound replaying WAL",
+          "confidence": 0.85,
+          "reasoning": "pg_stat_replication indicated elevated write_lag and flush_lag, and the replica was identified as I/O bound in TEST\u2011001."
+        },
+        {
+          "cause": "Insufficient replica IOPS",
+          "confidence": 0.7,
+          "reasoning": "Resolution of TEST\u2011001 increased replica IOPS from 3000 to 6000, implying the original IOPS were a limiting factor."
+        }
+      ],
+      "relevant_past_incidents": [
+        {
+          "incident": "TEST-001",
+          "relevance": "Same service, same symptoms, identical replication lag and write spike",
+          "previous_resolution": "Throttled batch import to 500 rows/s, increased replica IOPS from 3000 to 6000, enabled WAL compression, and added WAL sender rate limits",
+          "lesson": "High\u2011write features must be load\u2011tested for replication impact; enforce WAL sender limits and monitor replica_lag_seconds with 5\u202fs and 15\u202fs thresholds."
+        }
+      ],
+      "investigation_steps": [
+        "Verify current WAL sender pending bytes via pg_stat_replication",
+        "Check replica\u20113 I/O metrics (disk queue, throughput)",
+        "Confirm replica IOPS allocation",
+        "Inspect write_lag and flush_lag values",
+        "Review recent batch import throughput and rate",
+        "Check if WAL compression is enabled",
+        "Ensure replication alerts are configured for 5\u202fs and 15\u202fs thresholds"
+      ],
+      "recommended_next_action": "Throttle the batch import to 500 rows/s, increase replica IOPS to at least 6000, enable WAL compression, and set a WAL sender rate limit. Update monitoring to alert on replica_lag_seconds >5\u202fs and >15\u202fs.",
+      "memory_influence": "Recalled memories of incident TEST\u2011001 directly informed the cause assessment, recommended actions, and lessons applied to this incident.",
+      "memories_used_count": 10,
+      "recalled_memories": [
+        {
+          "id": "35c330c2-0f72-4720-ad00-9cd22f4d1183",
+          "text": "Incident TEST-001: Postgres Read Replica Lag Causing Slow Queries on database-cluster, severity high, symptoms stale data, replica lag 45 seconds, read query p99 8500 ms. Investigation found pending WAL bytes 2.3\u202fGB, replica\u20113 I/O bound replaying WAL, elevated write_lag and flush_lag. Resolution throttled batch import to 500 rows/s, increased replica IOPS from 3000 to 6000, added WAL compression, lag dropped to <1\u202fs within 10\u202fmin. Incident resolved.",
+          "type": "observation",
+          "entities": [
+            "p99",
+            "flush_lag",
+            "batch import",
+            "replica lag",
+            "replica-3",
+            "WAL compression",
+            "TEST-001",
+            "read query",
+            "Postgres",
+            "write_lag",
+            "database-cluster",
+            "severity high",
+            "WAL sender",
+            "replica IOPS"
+          ],
+          "document_id": null,
+          "context": null,
+          "score": 1.096941257370641
+        },
+        {
+          "id": "35c101e7-70b3-48fe-a7b7-f786345fad2b",
+          "text": "Incident TEST-001: Postgres Read Replica Lag Causing Slow Queries on database-cluster, severity high, symptoms stale data, replica lag 45 seconds, read query p99 8500 ms. | When: Monday, September 28, 2026",
+          "type": "world",
+          "entities": [
+            "database-cluster",
+            "Postgres",
+            "replica lag",
+            "TEST-001",
+            "severity high",
+            "p99",
+            "read query"
+          ],
+          "document_id": "TEST-001",
+          "context": "IncidentIQ production incident: database-cluster - Postgres Read Replica Lag Causing Slow Queries",
+          "score": 1.0961706432861713
+        },
+        {
+          "id": "44c065de-4ff8-4658-a3e4-23f9f25b003e",
+          "text": "The 3x write throughput from the batch import overwhelmed the WAL sender, causing replication lag to spike to 45 seconds on replica-3. | When: Monday, September 28, 2026",
+          "type": "world",
+          "entities": [
+            "batch import",
+            "replica-3",
+            "database-cluster",
+            "replica lag",
+            "WAL sender"
+          ],
+          "document_id": "TEST-001",
+          "context": "IncidentIQ production incident: database-cluster - Postgres Read Replica Lag Causing Slow Queries",
+          "score": 1.0947660976748972
+        },
+        {
+          "id": "1610701a-545a-4b48-a2d0-18a655dd0990",
+          "text": "Throttled batch import to 500 rows/s, increased replica IOPS from 3000 to 6000, added WAL compression, and lag dropped to <1 second within 10 minutes. | When: Monday, September 28, 2026",
+          "type": "world",
+          "entities": [
+            "replica-3",
+            "WAL compression",
+            "batch import",
+            "replica IOPS",
+            "database-cluster"
+          ],
+          "document_id": "TEST-001",
+          "context": "IncidentIQ production incident: database-cluster - Postgres Read Replica Lag Causing Slow Queries",
+          "score": 1.0938154543228644
+        },
+        {
+          "id": "f068c49e-261d-489b-8ba6-0214e8265ea7",
+          "text": "Always load-test replication impact before deploying high-write features, set WAL sender rate limits, and monitor replica_lag_seconds with alerts at 5s and 15s thresholds. | When: Monday, September 28, 2026",
+          "type": "world",
+          "entities": [
+            "WAL sender",
+            "replica lag",
+            "database-cluster",
+            "alerts"
+          ],
+          "document_id": "TEST-001",
+          "context": "IncidentIQ production incident: database-cluster - Postgres Read Replica Lag Causing Slow Queries",
+          "score": 1.0924513737776274
+        },
+        {
+          "id": "06da4d31-1860-4564-8059-3dfb15fd15a9",
+          "text": "New batch import feature deployed 2 hours ago, increasing write throughput by 3x. | When: Monday, September 28, 2026 13:05:02 UTC",
+          "type": "world",
+          "entities": [
+            "database-cluster",
+            "batch import",
+            "write throughput",
+            "WAL sender"
+          ],
+          "document_id": "TEST-001",
+          "context": "IncidentIQ production incident: database-cluster - Postgres Read Replica Lag Causing Slow Queries",
+          "score": 1.0905706213802013
+        },
+        {
+          "id": "98c7fea1-0b8c-40b9-b9a4-88a8b513e88b",
+          "text": "Investigated WAL sender stats, found pending bytes at 2.3 GB, replica-3 was I/O bound replaying WAL, and primary pg_stat_replication showed elevated write_lag and flush_lag. | When: Monday, September 28, 2026",
+          "type": "world",
+          "entities": [
+            "WAL sender",
+            "flush_lag",
+            "replica lag",
+            "write_lag",
+            "replica-3",
+            "database-cluster"
+          ],
+          "document_id": "TEST-001",
+          "context": "IncidentIQ production incident: database-cluster - Postgres Read Replica Lag Causing Slow Queries",
+          "score": 1.09017712964862
+        },
+        {
+          "id": "7a282dd2-8654-401d-a166-1ec74b3e3bf3",
+          "text": "The incident was resolved. | When: Monday, September 28, 2026",
+          "type": "world",
+          "entities": [
+            "database-cluster",
+            "TEST-001"
+          ],
+          "document_id": "TEST-001",
+          "context": "IncidentIQ production incident: database-cluster - Postgres Read Replica Lag Causing Slow Queries",
+          "score": 1.0816502630177067
+        },
+        {
+          "id": "054241c6-1fbd-436b-a5a6-14e02f39a0b3",
+          "text": "Always load-test replication impact before deploying high\u2011write features, set WAL sender rate limits, and monitor replica_lag_seconds with alerts at 5\u202fs and 15\u202fs thresholds.",
+          "type": "observation",
+          "entities": [
+            "WAL sender",
+            "replica lag",
+            "database-cluster",
+            "alerts"
+          ],
+          "document_id": null,
+          "context": null,
+          "score": 0.05920267887203847
+        },
+        {
+          "id": "3b933023-e96a-4620-ab0d-96e03c918419",
+          "text": "Batch import feature deployed, increasing write throughput by 3x.",
+          "type": "observation",
+          "entities": [
+            "batch import",
+            "database-cluster",
+            "WAL sender",
+            "write throughput"
+          ],
+          "document_id": null,
+          "context": null,
+          "score": 0.0006521847734115429
+        }
+      ]
+    },
+    "resolution": null
+  },
+  {
+    "id": "INC-202",
+    "title": "Order history pages loading slowly, stale data from standby database",
+    "service": "orders-api",
+    "severity": "high",
+    "symptoms": "Customers report that order history and account pages are slow and sometimes show outdated orders. Recently placed orders don't appear for several seconds. Read query latency has roughly tripled. Database alerts for the standby node are firing. The primary looks healthy.\n",
+    "metrics": "Standby replay delay: 28s (normally < 1s)\nRead query p95 latency: 2.4s (normally 600ms)\nStandby CPU: 94%, disk I/O wait: 38%\nPrimary CPU: 45%, write throughput up ~3x since 14:10 UTC\nError rate: 4% on read endpoints",
+    "logs": "WARN  orders-api  read query on standby exceeded 2000ms (p95)\nWARN  orders-api  stale read detected: order not found on standby, fell back to primary\nALERT postgres-standby-01: replay delay above threshold (28s)\nERROR orders-api  statement timeout on standby: SELECT * FROM orders WHERE customer_id = $1",
+    "recent_change": "Nightly data backfill job for the orders table was moved to run at 14:00 UTC instead of overnight, generating heavy write volume on the primary.",
+    "status": "open",
+    "created_at": "2026-09-28T15:52:34.448200+00:00",
+    "analysis": {
+      "summary": "The incident involves slow and stale reads from the standby PostgreSQL node after a recent change that increased write traffic on the primary. The standby replay delay has spiked to 28\u202fs, causing read queries to time out or fallback to the primary, leading to high latency and stale data.",
+      "likely_causes": [
+        {
+          "cause": "Increased write load on primary due to nightly backfill job now running at 14:00 UTC",
+          "confidence": 0.8,
+          "reasoning": "Heavy write volume increases WAL generation, causing the standby to lag behind and exceed its replay delay threshold."
+        },
+        {
+          "cause": "Standby CPU and I/O saturation (CPU 94%, disk I/O wait 38%)",
+          "confidence": 0.6,
+          "reasoning": "High resource utilization on the standby hampers its ability to replay WAL quickly, exacerbating the delay."
+        },
+        {
+          "cause": "Read queries hitting the standby during high latency",
+          "confidence": 0.7,
+          "reasoning": "The application attempts to read from standby, leading to timeouts and fallback to primary, which further increases load."
+        }
+      ],
+      "relevant_past_incidents": [],
+      "investigation_steps": [
+        "Check WAL generation rate on primary during backfill period.",
+        "Verify standby replication slots and ensure no lagging slots are causing backlog.",
+        "Inspect standby disk I/O and CPU usage; consider adding I/O capacity or moving to faster storage.",
+        "Confirm that the application is configured to read from primary when standby lag exceeds a threshold.",
+        "Review backfill job to see if it can be partitioned or throttled to reduce peak write load.",
+        "Check for any recent configuration changes to PostgreSQL replication settings.",
+        "Examine logs for any errors or warnings on both primary and standby around the time of the spike."
+      ],
+      "recommended_next_action": "Temporarily pause the nightly backfill job or throttle its write rate until the standby can catch up. Configure the application to read from the primary when standby lag exceeds 10\u202fs to avoid stale data and high latency. Monitor replication lag and standby resource usage closely.",
+      "memory_influence": "No relevant memories were recalled from Hindsight. This is a first-time incident for this bank; guidance below is generic and not based on prior resolutions.",
+      "memories_used_count": 0,
+      "recalled_memories": []
+    },
+    "resolution": null
+  },
+  {
+    "id": "INC-303",
+    "title": "Dashboard numbers out of date after bulk import, reports timing out",
+    "service": "analytics-dashboard",
+    "severity": "medium",
+    "symptoms": "Executives report that revenue and signup dashboards show numbers from several minutes ago. Some report queries time out. The issue started shortly after a large customer data import began. The reporting database node is under heavy load and database lag alerts are firing. The main application database is responding normally.",
+    "metrics": "Reporting replica replication delay: 41s (normally < 2s)\nReport query p95 latency: 6.1s (normally 900ms)\nReplica CPU: 97%, disk I/O wait: 45%\nPrimary write throughput: up ~4x since 09:20 UTC\nDashboard error rate: 6%",
+    "logs": "WARN  analytics-dashboard  report query exceeded 5000ms on reporting replica\nWARN  analytics-dashboard  data freshness check failed: replica behind primary by 41s\nALERT postgres-reporting-replica: replication delay above threshold (41s)\nERROR analytics-dashboard  statement timeout: SELECT date_trunc('hour', created_at), count(*) FROM signups GROUP BY 1",
+    "recent_change": "Marketing started a bulk import of 2M customer records at 09:15 UTC during business hours, with no throttling.",
+    "status": "open",
+    "created_at": "2026-09-28T15:56:13.598243+00:00",
+    "analysis": {
+      "summary": "The analytics\u2011dashboard service is experiencing stale data and query timeouts due to a large bulk import that has overloaded the reporting database replica, causing significant replication lag and high CPU/disk I/O wait.",
+      "likely_causes": [
+        {
+          "cause": "Replication lag from bulk write load on primary database",
+          "confidence": 0.8,
+          "reasoning": "The reporting replica shows a 41s delay, far above the normal <2s threshold, coinciding with a 4x increase in primary write throughput."
+        },
+        {
+          "cause": "Replica resource exhaustion (CPU 97%, disk I/O wait 45%)",
+          "confidence": 0.7,
+          "reasoning": "High CPU and I/O wait on the replica indicate it cannot keep up with the write stream, leading to query timeouts."
+        },
+        {
+          "cause": "Unthrottled bulk import of 2M records",
+          "confidence": 0.6,
+          "reasoning": "The import started at 09:15 UTC without throttling, likely generating a burst of writes that overwhelmed the replica."
+        }
+      ],
+      "relevant_past_incidents": [],
+      "investigation_steps": [
+        "Check current replication lag and confirm it is still >30s; if so, consider pausing the bulk import or throttling writes.\nExamine the replica\u2019s WAL receiver and archiver logs for errors.\nVerify that the replica\u2019s autovacuum and maintenance tasks are running; a backlog could exacerbate lag.\nInspect the primary\u2019s write queue and see if any long\u2011running transactions are blocking replication.\nCheck the replica\u2019s disk usage and I/O queue lengths; consider adding SSD or increasing I/O capacity.\nReview the bulk import job to see if it can be split into smaller batches or run during off\u2011peak hours.\nConfirm that the application\u2019s read queries are directed to the replica and that failover or read\u2011through options are available.\nMonitor the replica\u2019s CPU and I/O metrics after any changes to ensure they drop below thresholds."
+      ],
+      "recommended_next_action": "Temporarily pause the bulk import and throttle subsequent writes to the primary. Once replication lag falls below 10s and replica resource usage normalizes, resume the import in smaller batches or during off\u2011peak hours. Additionally, consider adding a dedicated reporting replica or scaling the existing one to handle peak write loads.",
+      "memory_influence": "No relevant memories were recalled from Hindsight. This is a first-time incident for this bank; guidance below is generic and not based on prior resolutions.",
+      "memories_used_count": 0,
+      "recalled_memories": []
+    },
+    "resolution": null
+  },
+  {
+    "id": "INC-101",
+    "title": "Payment API returning HTTP 500s, latency spiking",
+    "service": "payment-api",
+    "severity": "critical",
+    "symptoms": "Payment requests are failing with HTTP 500 errors. Latency has jumped from under 300ms to over 8 seconds. Checkout conversion is dropping. Database connection usage is at 99%. Application pods look healthy and CPU is normal.",
+    "metrics": "DB connection pool: 100/100 in use, 47 requests waiting\nRequest p95 latency: 8.2s (normally 280ms)\nError rate: 31% on /v1/payments\nPayment API pod CPU: 38%, memory: 55%\nTraffic: up ~2.5x since the 10:00 UTC promo email",
+    "logs": "ERROR payment-api  HTTP 500 POST /v1/payments\nERROR payment-api  could not acquire connection from pool: timeout after 30000ms\nWARN  payment-api  connection pool exhausted (100/100 in use, 47 waiting)\nALERT postgres-primary: connections at 99% of max",
+    "recent_change": "A marketing promo email went out at 10:00 UTC, roughly doubling checkout traffic. The connection pool size was unchanged at 100.",
+    "status": "resolved",
+    "created_at": "2026-09-28T16:19:47.208159+00:00",
+    "analysis": {
+      "summary": "Groq analysis was unavailable (4 validation errors for AnalysisResult\nlikely_causes.0.reasoning\n  Field required [type=missing, input_value={'cause': 'Connection poo...ool size remained 100.'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nlikely_causes.1.reasoning\n  Field required [type=missing, input_value={'cause': 'Long\u2011running... batch import feature.'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nlikely_causes.2.reasoning\n  Field required [type=missing, input_value={'cause': 'Insufficient p... when traffic doubled.'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nlikely_causes.3.reasoning\n  Field required [type=missing, input_value={'cause': 'Postgres repli...ations may be delayed.'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing). Recalled memories are still shown.",
+      "likely_causes": [],
+      "relevant_past_incidents": [],
+      "investigation_steps": [
+        "Review symptoms, metrics, and logs for the failing service.",
+        "Check recent deploys and config changes.",
+        "Compare against on-call runbooks if any exist outside this agent."
+      ],
+      "recommended_next_action": "Investigate manually; do not treat this as an AI diagnosis.",
+      "memory_influence": "LLM parsing failed; memories were retrieved but not reasoned over.",
+      "memories_used_count": 4,
+      "recalled_memories": [
+        {
+          "id": "d3ac57a4-a32a-484c-b843-f61a5bfc9b7a",
+          "text": "Incident INC-201: Postgres read replica lag causing slow queries, high severity, symptoms include stale data, 30s replica lag, slower reads, DB alerts firing; metrics show replica_lag_seconds 30, read_query_p99_ms 8500, replication_throughput_mbps 12; error logs show warnings and errors; root cause, investigation, resolution involved running python -m uvicorn main:app --host 127.0.0.1 --port 8000; outcome: replica lag returned to <1s, reads healthy; lesson learned: same command | When: 2026-09-28",
+          "type": "world",
+          "entities": [
+            "replication throughput",
+            "stale data",
+            "replica lag",
+            "INC-201",
+            "replica",
+            "database-cluster",
+            "3x",
+            "read queries",
+            "8000",
+            "main:app",
+            "slow reads",
+            "high",
+            "batch import feature",
+            "uvicorn",
+            "127.0.0.1",
+            "WAL sender",
+            "slow queries",
+            "30s",
+            "8500ms",
+            "DB alerts",
+            "read_query_p99_ms",
+            "2.3GB",
+            "python",
+            "Postgres"
+          ],
+          "document_id": "INC-201",
+          "context": "IncidentIQ production incident: database-cluster - Postgres read replica lag causing slow queries",
+          "score": 0.031636302199618535
+        },
+        {
+          "id": "efeaa54e-16d4-43da-95d7-30e76aab242f",
+          "text": "Write throughput increased ~3x after batch import feature deployed two hours before the incident | When: 2026-09-28",
+          "type": "world",
+          "entities": [
+            "write throughput",
+            "batch import feature"
+          ],
+          "document_id": "INC-201",
+          "context": "IncidentIQ production incident: database-cluster - Postgres read replica lag causing slow queries",
+          "score": 0.012642049835552614
+        },
+        {
+          "id": "c7c5783a-9954-405d-a3c7-4f1e0a2d0dec",
+          "text": "Postgres replica lag caused slow reads | When: 2026-09-28 | IncidentIQ test",
+          "type": "world",
+          "entities": [
+            "replica",
+            "IncidentIQ",
+            "Postgres"
+          ],
+          "document_id": "87795139-7074-4aaa-ab67-e665f5e7abb2",
+          "context": "IncidentIQ test",
+          "score": 0.007417866759932432
+        },
+        {
+          "id": "0e8606fc-d21c-469a-bc60-52968b5429d8",
+          "text": "Fixed by restarting replica and adding resources | When: 2026-09-28 | IncidentIQ test",
+          "type": "world",
+          "entities": [
+            "replica",
+            "resources"
+          ],
+          "document_id": "87795139-7074-4aaa-ab67-e665f5e7abb2",
+          "context": "IncidentIQ test",
+          "score": 0.0066447635757626725
+        }
+      ]
+    },
+    "resolution": {
+      "root_cause": "Database connection pool exhaustion. The promo traffic surge needed more concurrent connections than the pool size of 100 allowed, so requests queued, timed out and returned 500s.",
+      "investigation": "Checked pool utilization (100/100, 47 waiting), confirmed pods had spare CPU and memory, saw DB connections at 99%, and correlated the start of the errors with the 10:00 UTC promo traffic.",
+      "resolution": "Increased the connection pool from 100 to 200, restarted the payment-api pods gradually, and confirmed the database could handle the higher connection count. Errors dropped to baseline within 5 minutes.",
+      "outcome": "Resolved",
+      "lesson": "Check connection pool utilization early when you see 500s with high latency and healthy pods. Size pools for peak traffic and alert on pool usage above 80%."
+    }
+  },
+  {
+    "id": "INC-204",
+    "title": "Order placement timing out, \"too many clients\" from the database",
+    "service": "orders-service",
+    "severity": "high",
+    "symptoms": "Customers get errors when placing orders and the app hangs on the confirmation screen. Requests time out after about 30 seconds. The database is refusing new connections. Servers are not under heavy CPU or memory load.",
+    "metrics": "DB connection pool: 80/80 active, 61 queued\nOrder API p95 latency: 12s (normally 400ms)\nError rate: 24% on POST /orders\nService CPU: 41%, memory: 60%\nTraffic: 2x normal after a flash sale started at 18:00 UTC",
+    "logs": "ERROR orders-service  FATAL: sorry, too many clients already\nERROR orders-service  timeout waiting for a free database connection (30s)\nWARN  orders-service  db pool at max: 80/80 active, 61 queued\nALERT postgres-primary: active connections 97% of max_connections",
+    "recent_change": "A flash sale started at 18:00 UTC, doubling order volume. Pool size was still the default of 80.",
+    "status": "resolved",
+    "created_at": "2026-09-28T16:22:05.865444+00:00",
+    "analysis": {
+      "summary": "Orders-service is experiencing order placement timeouts due to database connection pool exhaustion after a flash sale doubled traffic. The pool is at its default size of 80/80 active connections with 61 queued requests, and the database reports 97% of max_connections in use. CPU and memory are normal, indicating the bottleneck is connection limits rather than resource contention.",
+      "likely_causes": [
+        {
+          "cause": "Connection pool exhaustion caused by increased traffic",
+          "confidence": 0.9,
+          "reasoning": "Logs show \"too many clients\" and the pool is at 80/80 active. Memory about INC-101 documents identical symptoms when a flash sale doubled traffic and the pool was exhausted."
+        },
+        {
+          "cause": "Database max_connections limit reached",
+          "confidence": 0.7,
+          "reasoning": "Alert shows 97% of max_connections used; memory about INC-101 notes DB connections at 99% during a similar incident."
+        },
+        {
+          "cause": "Insufficient pool size for peak traffic",
+          "confidence": 0.8,
+          "reasoning": "Default pool size of 80 was not sized for the doubled order volume; memory about INC-101 recommends sizing pools for peak traffic and alerting when usage exceeds 80%."
+        }
+      ],
+      "relevant_past_incidents": [
+        {
+          "incident": "INC-101",
+          "relevance": "Connection pool exhaustion caused HTTP 500s and latency spikes in payment-api during a traffic surge.",
+          "previous_resolution": "Increased connection pool to 200, restarted pods gradually; errors dropped within 5 minutes.",
+          "lesson": "Monitor pool utilization early, size pools for peak traffic, and alert when usage exceeds 80%."
+        }
+      ],
+      "investigation_steps": [
+        "Verify current Postgres max_connections and current usage via pg_stat_activity.",
+        "Check orders-service configuration for connection pool size and max queue length.",
+        "Compare current request rate to the flash sale traffic spike to confirm load increase.",
+        "Inspect recent deployments for changes to pool size or DB connection settings.",
+        "Monitor pool usage and DB connections in real time to confirm the bottleneck.",
+        "If possible, temporarily increase pool size or add a read replica to relieve pressure."
+      ],
+      "recommended_next_action": "Increase the orders-service connection pool size to at least 200 (or proportionally to the doubled traffic) and restart the pods gradually to apply the new configuration. Additionally, raise the Postgres max_connections if needed and set up an alert for pool usage >80% to prevent recurrence.",
+      "memory_influence": "Recalled memories of incident INC-101 provided concrete evidence that connection pool exhaustion caused similar symptoms and that increasing the pool size resolved the issue, directly shaping the recommended action.",
+      "memories_used_count": 10,
+      "recalled_memories": [
+        {
+          "id": "4fb2ee55-5b66-459c-bc5f-8b47f7d58563",
+          "text": "Resolved incident by increasing connection pool to 200, restarting pods gradually, errors dropped within 5 minutes. | When: 2026-09-28T16:20:38+00:00 | to restore service",
+          "type": "world",
+          "entities": [
+            "200",
+            "connection pool",
+            "pods",
+            "errors",
+            "5 minutes"
+          ],
+          "document_id": "INC-101",
+          "context": "IncidentIQ production incident: payment-api - Payment API returning HTTP 500s, latency spiking",
+          "score": 0.010078962684659827
+        },
+        {
+          "id": "efeaa54e-16d4-43da-95d7-30e76aab242f",
+          "text": "Write throughput increased ~3x after batch import feature deployed two hours before the incident | When: 2026-09-28",
+          "type": "world",
+          "entities": [
+            "batch import feature",
+            "write throughput"
+          ],
+          "document_id": "INC-201",
+          "context": "IncidentIQ production incident: database-cluster - Postgres read replica lag causing slow queries",
+          "score": 0.0058925320411444704
+        },
+        {
+          "id": "65383f87-6ef1-4512-8823-5306139257bb",
+          "text": "Lesson learned: monitor connection pool utilization early when encountering 500s with high latency and healthy pods; size pools for peak traffic and alert when usage exceeds 80%. | When: 2026-09-28T16:20:38+00:00 | prevent future incidents",
+          "type": "world",
+          "entities": [
+            "500s",
+            "latency",
+            "healthy pods",
+            "80%",
+            "pool size",
+            "connection pool"
+          ],
+          "document_id": "INC-101",
+          "context": "IncidentIQ production incident: payment-api - Payment API returning HTTP 500s, latency spiking",
+          "score": 0.005842757735815599
+        },
+        {
+          "id": "d3ac57a4-a32a-484c-b843-f61a5bfc9b7a",
+          "text": "Incident INC-201: Postgres read replica lag causing slow queries, high severity, symptoms include stale data, 30s replica lag, slower reads, DB alerts firing; metrics show replica_lag_seconds 30, read_query_p99_ms 8500, replication_throughput_mbps 12; error logs show warnings and errors; root cause, investigation, resolution involved running python -m uvicorn main:app --host 127.0.0.1 --port 8000; outcome: replica lag returned to <1s, reads healthy; lesson learned: same command | When: 2026-09-28",
+          "type": "world",
+          "entities": [
+            "replication throughput",
+            "INC-201",
+            "replica",
+            "slow reads",
+            "high",
+            "uvicorn",
+            "WAL sender",
+            "slow queries",
+            "8500ms",
+            "DB alerts",
+            "2.3GB",
+            "Postgres",
+            "stale data",
+            "replica lag",
+            "database-cluster",
+            "3x",
+            "read queries",
+            "8000",
+            "main:app",
+            "batch import feature",
+            "127.0.0.1",
+            "30s",
+            "read_query_p99_ms",
+            "python"
+          ],
+          "document_id": "INC-201",
+          "context": "IncidentIQ production incident: database-cluster - Postgres read replica lag causing slow queries",
+          "score": 0.005790209849189628
+        },
+        {
+          "id": "d5e9d086-33d2-4df0-95d7-753c3f1c98cb",
+          "text": "Marketing promo email sent at 10:00 UTC, roughly doubling checkout traffic. | When: 2026-09-28T10:00:00+00:00 | marketing promotion",
+          "type": "world",
+          "entities": [
+            "10:00 UTC",
+            "promo email",
+            "checkout traffic"
+          ],
+          "document_id": "INC-101",
+          "context": "IncidentIQ production incident: payment-api - Payment API returning HTTP 500s, latency spiking",
+          "score": 0.005766655033780366
+        },
+        {
+          "id": "ec93cb4e-89f8-4f20-bbcd-c55319dfd44a",
+          "text": "Connection pool exhausted: 100/100 connections in use, 47 waiting, pool size unchanged at 100. | When: 2026-09-28T10:00:00+00:00 | traffic surge exceeded pool capacity",
+          "type": "world",
+          "entities": [
+            "100 connections",
+            "connection pool",
+            "pool size",
+            "47 waiting"
+          ],
+          "document_id": "INC-101",
+          "context": "IncidentIQ production incident: payment-api - Payment API returning HTTP 500s, latency spiking",
+          "score": 0.0054974792232955995
+        },
+        {
+          "id": "04543d82-3081-4d13-bfd6-aacd9afa32ec",
+          "text": "Incident resolved, service restored to baseline. | When: 2026-09-28T16:20:38+00:00 | service restored",
+          "type": "world",
+          "entities": [
+            "resolved",
+            "IncidentIQ",
+            "service"
+          ],
+          "document_id": "INC-101",
+          "context": "IncidentIQ production incident: payment-api - Payment API returning HTTP 500s, latency spiking",
+          "score": 0.005405835677696062
+        },
+        {
+          "id": "00065f1f-00ce-4cd2-8ff9-f27b71a57ea9",
+          "text": "HTTP 500 errors and latency spiking to 8.2s caused by connection pool exhaustion. | When: 2026-09-28T10:00:00+00:00 | connection pool exhaustion caused timeouts",
+          "type": "world",
+          "entities": [
+            "latency",
+            "connection pool",
+            "HTTP 500"
+          ],
+          "document_id": "INC-101",
+          "context": "IncidentIQ production incident: payment-api - Payment API returning HTTP 500s, latency spiking",
+          "score": 0.00472372318654676
+        },
+        {
+          "id": "7b16347a-d126-4adf-bc54-d64e4e176eff",
+          "text": "Incident INC-101 on payment-api: critical severity, HTTP 500 errors, latency spiking from <300ms to >8s, checkout conversion dropping, DB connections at 99%, pods healthy, CPU normal. | When: 2026-09-28",
+          "type": "world",
+          "entities": [
+            "latency",
+            "INC-201",
+            "DB connections",
+            "payment-api",
+            "CPU",
+            "pods",
+            "HTTP 500"
+          ],
+          "document_id": "INC-101",
+          "context": "IncidentIQ production incident: payment-api - Payment API returning HTTP 500s, latency spiking",
+          "score": 0.004133805442459319
+        },
+        {
+          "id": "c7c5783a-9954-405d-a3c7-4f1e0a2d0dec",
+          "text": "Postgres replica lag caused slow reads | When: 2026-09-28 | IncidentIQ test",
+          "type": "world",
+          "entities": [
+            "replica",
+            "IncidentIQ",
+            "Postgres"
+          ],
+          "document_id": "87795139-7074-4aaa-ab67-e665f5e7abb2",
+          "context": "IncidentIQ test",
+          "score": 0.002616051564691224
+        }
+      ]
+    },
+    "resolution": {
+      "root_cause": "The connection pool was too small for flash sale traffic. All 80 connections were in use, later requests queued and timed out, and the database hit its connection limit.",
+      "investigation": "Recognized the same pattern as the earlier payment API incident: errors with healthy CPU and memory. Checked pool utilization (80/80, 61 queued) and database connection count, and correlated timing with the flash sale start.",
+      "resolution": "Increased the pool from 80 to 160 and confirmed max_connections could handle it. Rolled the change out gradually, then added a pool usage alert at 80%. Errors cleared within 6 minutes.",
+      "outcome": "Resolved",
+      "lesson": "When services time out with healthy CPU and memory, check connection pool utilization first. Plan pool capacity around promotions and flash sales, and alert before the pool saturates."
+    }
+  },
+  {
+    "id": "INC-305",
+    "title": "Email and push notifications delayed, workers stuck waiting on the database",
+    "service": "notification-service",
+    "severity": "medium",
+    "symptoms": "Notifications are arriving 10+ minutes late. Queue depth keeps growing. Workers appear idle and stuck waiting on the database. Some jobs fail with timeout errors. Host CPU and memory are normal. The issue started after the weekend newsletter was queued.",
+    "metrics": "DB connection pool: 50/50 in use, 120 waiting\nNotification delay p95: 11 minutes (normally 20s)\nJob failure rate: 14%\nWorker CPU: 22%, memory: 48%\nQueue depth: 48,000 (normally under 1,000)",
+    "logs": "ERROR notification-worker  could not obtain database connection: pool timeout\nWARN  notification-worker  pool saturated (50/50 in use), 120 jobs waiting\nWARN  notification-service  queue depth 48,000 and growing\nALERT postgres-primary: connection usage at 94%",
+    "recent_change": "The weekend newsletter, about 500k recipients, was queued at 09:00 UTC. Worker concurrency had been raised last week without increasing the pool size.",
+    "status": "resolved",
+    "created_at": "2026-09-28T16:24:37.224337+00:00",
+    "analysis": {
+      "summary": "The notification-service is experiencing a severe backlog due to the database connection pool being saturated (50/50 in use) while 120 jobs wait, causing workers to stall and jobs to timeout. The root cause is a mismatch between worker concurrency and the pool size, exacerbated by the large weekend newsletter load.",
+      "likely_causes": [
+        {
+          "cause": "Connection pool exhausted due to increased worker concurrency without scaling pool size",
+          "confidence": 0.92,
+          "reasoning": "Logs show \"pool timeout\" and \"pool saturated\" with 50/50 usage and 120 waiting jobs. The recent change increased worker concurrency, matching memory 50/50 usage. Historical incidents INC-101 and INC-204 documented similar pool exhaustion scenarios."
+        },
+        {
+          "cause": "Sudden traffic surge from the weekend newsletter (\u2248500k recipients) exceeded expected peak load",
+          "confidence": 0.78,
+          "reasoning": "The newsletter was queued at 09:00 UTC, aligning with the spike in queue depth and job failures. Past incidents (INC-101) noted traffic doubling during promotions."
+        },
+        {
+          "cause": "Insufficient alerting on pool utilization thresholds",
+          "confidence": 0.65,
+          "reasoning": "Alert only triggered at 94% usage; earlier thresholds (80%) were not set, as per lessons from INC-204."
+        }
+      ],
+      "relevant_past_incidents": [
+        {
+          "incident": "INC-101",
+          "relevance": "Connection pool exhaustion during high traffic promotion",
+          "previous_resolution": "Increased pool size to 200, restarted pods gradually, errors dropped within 5 minutes",
+          "lesson": "Scale pool size with traffic spikes and set alerts before saturation"
+        },
+        {
+          "incident": "INC-204",
+          "relevance": "Order-service timeout due to too many DB connections",
+          "previous_resolution": "Adjusted pool size, added monitoring, resolved after scaling",
+          "lesson": "Check pool utilization first when CPU/memory are normal; plan capacity around promotions and flash sales"
+        }
+      ],
+      "investigation_steps": [
+        "Verify current pool size and max connections in Postgres config",
+        "Check worker concurrency settings and compare to pool size",
+        "Inspect recent queue depth growth and correlate with newsletter schedule",
+        "Review DB connection limits and any throttling policies",
+        "Confirm no other services increased load on the same DB",
+        "Check for any recent code deployments affecting DB usage",
+        "Set alert thresholds at 80% usage if not already set"
+      ],
+      "recommended_next_action": "Temporarily increase the notification-service DB connection pool to 200, restart workers gradually, and monitor queue depth and connection usage. Once stabilized, adjust pool size permanently and implement 80% utilization alerts.",
+      "memory_influence": "Recalled memories of INC-101 and INC-204 informed the analysis of connection pool exhaustion as the primary cause, guided the recommended scaling action, and highlighted the importance of early pool utilization monitoring.",
+      "memories_used_count": 10,
+      "recalled_memories": [
+        {
+          "id": "d5e9d086-33d2-4df0-95d7-753c3f1c98cb",
+          "text": "Marketing promo email sent at 10:00 UTC, roughly doubling checkout traffic. | When: 2026-09-28T10:00:00+00:00 | marketing promotion",
+          "type": "world",
+          "entities": [
+            "10:00 UTC",
+            "promo email",
+            "checkout traffic"
+          ],
+          "document_id": "INC-101",
+          "context": "IncidentIQ production incident: payment-api - Payment API returning HTTP 500s, latency spiking",
+          "score": 0.10405511034793363
+        },
+        {
+          "id": "65383f87-6ef1-4512-8823-5306139257bb",
+          "text": "Lesson learned: monitor connection pool utilization early when encountering 500s with high latency and healthy pods; size pools for peak traffic and alert when usage exceeds 80%. | When: 2026-09-28T16:20:38+00:00 | prevent future incidents",
+          "type": "world",
+          "entities": [
+            "500s",
+            "latency",
+            "healthy pods",
+            "80%",
+            "pool size",
+            "connection pool"
+          ],
+          "document_id": "INC-101",
+          "context": "IncidentIQ production incident: payment-api - Payment API returning HTTP 500s, latency spiking",
+          "score": 0.08105848182115576
+        },
+        {
+          "id": "04543d82-3081-4d13-bfd6-aacd9afa32ec",
+          "text": "Incident resolved, service restored to baseline. | When: 2026-09-28T16:20:38+00:00 | service restored",
+          "type": "world",
+          "entities": [
+            "resolved",
+            "IncidentIQ",
+            "service"
+          ],
+          "document_id": "INC-101",
+          "context": "IncidentIQ production incident: payment-api - Payment API returning HTTP 500s, latency spiking",
+          "score": 0.05709725663223241
+        },
+        {
+          "id": "0613ab9e-db50-4db3-946d-13beed7318c4",
+          "text": "During incident, DB connection pool was 80/80 active with 61 queued, order API p95 latency 12s, error rate 24% on POST /orders, service CPU 41%, memory 60%, traffic 2x normal after flash sale. | Involving: orders-service",
+          "type": "world",
+          "entities": [
+            "memory",
+            "CPU",
+            "database",
+            "orders-service",
+            "flash sale"
+          ],
+          "document_id": "INC-204",
+          "context": "IncidentIQ production incident: orders-service - Order placement timing out, \"too many clients\" from the database",
+          "score": 0.05379005504912054
+        },
+        {
+          "id": "4fb2ee55-5b66-459c-bc5f-8b47f7d58563",
+          "text": "Resolved incident by increasing connection pool to 200, restarting pods gradually, errors dropped within 5 minutes. | When: 2026-09-28T16:20:38+00:00 | to restore service",
+          "type": "world",
+          "entities": [
+            "200",
+            "connection pool",
+            "pods",
+            "errors",
+            "5 minutes"
+          ],
+          "document_id": "INC-101",
+          "context": "IncidentIQ production incident: payment-api - Payment API returning HTTP 500s, latency spiking",
+          "score": 0.05373206467375865
+        },
+        {
+          "id": "ec93cb4e-89f8-4f20-bbcd-c55319dfd44a",
+          "text": "Connection pool exhausted: 100/100 connections in use, 47 waiting, pool size unchanged at 100. | When: 2026-09-28T10:00:00+00:00 | traffic surge exceeded pool capacity",
+          "type": "world",
+          "entities": [
+            "100 connections",
+            "connection pool",
+            "pool size",
+            "47 waiting"
+          ],
+          "document_id": "INC-101",
+          "context": "IncidentIQ production incident: payment-api - Payment API returning HTTP 500s, latency spiking",
+          "score": 0.04826948923161597
+        },
+        {
+          "id": "efeaa54e-16d4-43da-95d7-30e76aab242f",
+          "text": "Write throughput increased ~3x after batch import feature deployed two hours before the incident | When: 2026-09-28",
+          "type": "world",
+          "entities": [
+            "batch import feature",
+            "write throughput"
+          ],
+          "document_id": "INC-201",
+          "context": "IncidentIQ production incident: database-cluster - Postgres read replica lag causing slow queries",
+          "score": 0.0479889636996143
+        },
+        {
+          "id": "86b3573c-8f85-4651-9019-7308a24c13ca",
+          "text": "Lesson learned: when services time out with healthy CPU and memory, check connection pool utilization first; plan pool capacity around promotions and flash sales, and alert before the pool saturates.",
+          "type": "world",
+          "entities": [
+            "orders-service",
+            "database",
+            "connection pool",
+            "flash sale"
+          ],
+          "document_id": "INC-204",
+          "context": "IncidentIQ production incident: orders-service - Order placement timing out, \"too many clients\" from the database",
+          "score": 0.04331051024810754
+        },
+        {
+          "id": "46293e35-ca01-487e-b507-8fcb80fd29f4",
+          "text": "Incident INC-204: orders-service order placement timing out due to too many clients from database, severity high, customers receive errors, app hangs, requests time out after ~30s, database refusing new connections, servers not under heavy CPU or memory load. | Involving: orders-service",
+          "type": "world",
+          "entities": [
+            "memory",
+            "INC-201",
+            "database",
+            "orders-service",
+            "CPU"
+          ],
+          "document_id": "INC-204",
+          "context": "IncidentIQ production incident: orders-service - Order placement timing out, \"too many clients\" from the database",
+          "score": 0.04261020252673932
+        },
+        {
+          "id": "22d19f05-ccb7-49b6-b415-cc442514e039",
+          "text": "Root cause was the connection pool being too small; all 80 connections were in use, requests queued and timed out, and the database hit its connection limit. | Involving: orders-service",
+          "type": "world",
+          "entities": [
+            "database",
+            "orders-service",
+            "connection pool"
+          ],
+          "document_id": "INC-204",
+          "context": "IncidentIQ production incident: orders-service - Order placement timing out, \"too many clients\" from the database",
+          "score": 0.04191788232880847
+        }
+      ]
+    },
+    "resolution": {
+      "root_cause": "Database connection pool exhaustion. Worker concurrency was raised last week without increasing the pool size, and the weekend newsletter (about 500k recipients) pushed demand past the pool limit of 50. Workers blocked waiting for connections, the queue backed up, and notifications were delayed.",
+      "investigation": "1. Saw that worker CPU (22%) and memory (48%) were normal, so the hosts were not the bottleneck.\n2. Checked pool utilization: 50/50 in use with 120 jobs waiting, and DB connections at 94%.\n3. Recognized the same pattern as the earlier payment API and orders incidents.\n4. Correlated the start of the delays with the 09:00 UTC newsletter and last week's worker concurrency increase.",
+      "resolution": "Increased the worker connection pool from 50 to 100 after confirming max_connections had headroom. Rolled out gradually, then throttled the newsletter batch size and added a pool usage alert at 80%. Queue depth drained to normal within 20 minutes and notification delay returned to about 20 seconds.",
+      "outcome": "Resolved.",
+      "lesson": "When work queues back up with idle workers and normal CPU and memory, check database connection pool saturation first. Whenever worker concurrency or batch size increases, raise the pool size with it, and alert on pool usage above 80%."
+    }
+  },
+  {
+    "id": "SAMPLE-001",
+    "title": "Postgres Replication Lag",
+    "service": "Payments Database",
+    "severity": "high",
+    "symptoms": "Replica lag has increased to 30 seconds. Read queries are becoming slower. Database replication alerts are firing.",
+    "metrics": "replication_lag_seconds = 30\nread_latency_ms = 850",
+    "logs": "replica falling behind primary\nreplication apply process delayed",
+    "recent_change": null,
+    "status": "resolved",
+    "created_at": "2026-09-28T08:15:00+00:00",
+    "analysis": null,
+    "resolution": {
+      "root_cause": "Replica resource saturation caused replication apply delays.",
+      "investigation": "Checked replica CPU and replication process health. Compared WAL generation and apply lag.",
+      "resolution": "Restarted the replica and increased replication resources.",
+      "outcome": "Replication lag returned to normal and read latency recovered.",
+      "lesson": "Monitor replica resource saturation before replication lag becomes severe."
+    }
+  },
+  {
+    "id": "SAMPLE-002",
+    "title": "Read Replica Falling Behind",
+    "service": "Payments Database",
+    "severity": "high",
+    "symptoms": "The read replica is several seconds behind the primary. Read latency has increased significantly. Replication alerts are firing.",
+    "metrics": "replica_lag = 27 seconds\nread_latency = 790 ms",
+    "logs": "replica apply process delayed\nreplica is falling behind primary",
+    "recent_change": null,
+    "status": "open",
+    "created_at": "2026-09-29T10:30:00+00:00",
+    "analysis": null,
+    "resolution": null
+  },
+  {
+    "id": "SAMPLE-003",
+    "title": "Redis Cache Latency Spike",
+    "service": "Checkout Cache",
+    "severity": "medium",
+    "symptoms": "Cache response times increased significantly and checkout requests are intermittently slower.",
+    "metrics": "cache_latency_ms = 420\ncache_hit_rate = 71%",
+    "logs": "redis command latency increased\ncache hit rate dropped",
+    "recent_change": null,
+    "status": "resolved",
+    "created_at": "2026-09-27T14:45:00+00:00",
+    "analysis": null,
+    "resolution": {
+      "root_cause": "Redis memory pressure caused increased command latency.",
+      "investigation": "Reviewed Redis memory usage and eviction policy metrics.",
+      "resolution": "Increased Redis memory allocation and removed stale cache entries.",
+      "outcome": "Cache latency dropped back to normal and checkout performance recovered.",
+      "lesson": "Monitor Redis memory pressure and cache hit rate together."
+    }
+  }
+]
